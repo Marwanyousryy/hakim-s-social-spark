@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Cairo:wght@700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,8 +10,20 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 222 39% 6%;
+    --foreground: 40 30% 96%;
+
+    --gold: 42 75% 58%;
+    --gold-bright: 45 90% 65%;
+    --gold-deep: 38 65% 42%;
+
+    --gradient-gold: linear-gradient(135deg, hsl(38 65% 42%), hsl(45 90% 65%), hsl(38 65% 42%));
+    --gradient-radial: radial-gradient(ellipse at top, hsl(42 75% 58% / 0.18), transparent 60%);
+    --shadow-gold: 0 20px 60px -20px hsl(42 75% 58% / 0.45);
+    --shadow-soft: 0 10px 40px -10px hsl(0 0% 0% / 0.6);
+
+    --__unused: 0 0% 100%;
+    --__unused2: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -101,5 +115,42 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Tajawal', system-ui, sans-serif;
+    background-image: var(--gradient-radial);
+    background-attachment: fixed;
+  }
+
+  html[dir="rtl"] {
+    font-family: 'Tajawal', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+  }
+  .text-gold {
+    color: hsl(var(--gold));
+  }
+  .bg-gold {
+    background-color: hsl(var(--gold));
+  }
+  .border-gold {
+    border-color: hsl(var(--gold));
+  }
+  .gradient-gold-text {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .shadow-gold {
+    box-shadow: var(--shadow-gold);
+  }
+  .grid-pattern {
+    background-image:
+      linear-gradient(hsl(var(--gold) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--gold) / 0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
   }
 }
