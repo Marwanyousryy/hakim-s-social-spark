@@ -131,8 +131,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
       return new Response(
         JSON.stringify({ error: "مفتاح الذكاء الاصطناعي غير مهيأ" }),
         {
@@ -150,24 +150,28 @@ Deno.serve(async (req) => {
       language,
     });
 
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000,
+          },
+        }),
       },
-      body: JSON.stringify({
-        model: "claude-haiku-3-5-20251001",
-        max_tokens: 1000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
+    );
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error("Anthropic error", anthropicRes.status, errText);
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error("Gemini error", geminiRes.status, errText);
       return new Response(
         JSON.stringify({
           error: "حصلت مشكلة في توليد المحتوى، جرّب تاني بعد شوية",
@@ -179,8 +183,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const aiPayload = await anthropicRes.json();
-    const text: string = aiPayload?.content?.[0]?.text ?? "";
+    const aiPayload = await geminiRes.json();
+    const text: string =
+      aiPayload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const parsed = extractJson(text);
 
     // Track usage (best-effort)
