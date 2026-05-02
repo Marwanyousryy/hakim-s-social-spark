@@ -1,5 +1,6 @@
 import { Sparkles, Calendar, BarChart3, ArrowLeft, Check } from "lucide-react";
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 
 const features = [
@@ -21,13 +22,13 @@ const features = [
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    toast.success("تمام! هنبعتلك دعوة الوصول المبكر قريب 🎉");
-    setEmail("");
+    navigate(`/register?email=${encodeURIComponent(email)}`);
   };
 
   return (
@@ -40,12 +41,20 @@ const Index = () => {
           </div>
           <span className="font-display text-xl font-black tracking-tight">حاكم</span>
         </div>
-        <a
-          href="#signup"
-          className="hidden rounded-full border border-gold/30 px-5 py-2 text-sm text-gold transition hover:bg-gold/10 sm:inline-block"
-        >
-          ابدأ مجاناً
-        </a>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/login"
+            className="rounded-full px-4 py-2 text-sm text-foreground/70 transition hover:text-foreground"
+          >
+            دخول
+          </Link>
+          <Link
+            to="/register"
+            className="rounded-full border border-gold/30 px-5 py-2 text-sm text-gold transition hover:bg-gold/10"
+          >
+            ابدأ مجاناً
+          </Link>
+        </div>
       </header>
 
       {/* Hero */}
