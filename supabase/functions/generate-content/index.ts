@@ -71,16 +71,16 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(
+    const { data: userData, error: userErr } = await supabase.auth.getUser(
       authHeader.replace("Bearer ", ""),
     );
-    if (claimsErr || !claimsData?.claims) {
+    if (userErr || !userData?.user) {
       return new Response(JSON.stringify({ error: "غير مصرح" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = userData.user.id;
 
     const body = await req.json();
     const { description, platform, tone, language, businessType } = body ?? {};
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     });
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
