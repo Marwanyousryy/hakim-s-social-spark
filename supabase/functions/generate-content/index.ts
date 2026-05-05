@@ -131,8 +131,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
       return new Response(
         JSON.stringify({ error: "مفتاح الذكاء الاصطناعي غير مهيأ" }),
         {
@@ -150,42 +150,47 @@ Deno.serve(async (req) => {
       language,
     });
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    const aiRes = await fetch(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }],
-            },
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userPrompt },
           ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000,
-          },
         }),
       },
     );
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini error", geminiRes.status, errText);
+    if (!aiRes.ok) {
+      if (aiRes.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "كتر الطلبات، استنى شوية وجرب تاني" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (aiRes.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "الرصيد خلص، رجاءً اشحن باقتك من Lovable" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const errText = await aiRes.text();
+      console.error("AI gateway error", aiRes.status, errText);
       return new Response(
-        JSON.stringify({
-          error: "حصلت مشكلة في توليد المحتوى، جرّب تاني بعد شوية",
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "حصلت مشكلة في توليد المحتوى، جرّب تاني بعد شوية" }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const aiPayload = await geminiRes.json();
-    const text: string =
-      aiPayload?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const aiPayload = await aiRes.json();
+    const text: string = aiPayload?.choices?.[0]?.message?.content ?? "";
     const parsed = extractJson(text);
 
     // Track usage (best-effort)
