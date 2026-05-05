@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Home, PenSquare, Calendar, BarChart3, Settings, Gem, LogOut, Menu, X } from "lucide-react";
+import { Home, PenSquare, Calendar, BarChart3, Settings, Gem, LogOut, Menu, X, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -101,6 +101,14 @@ const DashboardLayout = () => {
               <div className="truncate text-xs text-foreground/50">{user?.email}</div>
             </div>
           </div>
+          <Link
+            to="/pricing"
+            onClick={() => setOpen(false)}
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-[hsl(var(--gold-deep))] via-[hsl(var(--gold))] to-[hsl(var(--gold-bright))] px-3 py-2.5 text-sm font-bold text-background shadow-gold transition hover:scale-[1.02]"
+          >
+            <Sparkles className="h-4 w-4" />
+            ترقية
+          </Link>
           <button
             onClick={handleLogout}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-foreground/15 px-3 py-2.5 text-sm text-foreground/80 transition hover:border-destructive/40 hover:text-destructive"
