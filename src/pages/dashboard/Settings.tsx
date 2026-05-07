@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Instagram, Facebook, Twitter, Youtube, Sparkles } from "lucide-react";
+import { Instagram, Facebook, Twitter, Youtube, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +18,8 @@ const Settings = () => {
   const [profile, setProfile] = useState({ full_name: "", business_name: "", business_type: "" });
   const [saving, setSaving] = useState(false);
   const [notif, setNotif] = useState({ posts: true, weekly: true, marketing: false });
+  const [plan, setPlan] = useState<{ plan: string; end: string | null } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!user) return;
