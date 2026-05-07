@@ -9,6 +9,7 @@ const LAUNCH_END = Date.now() + 30 * 24 * 60 * 60 * 1000;
 
 const plans = [
   {
+    id: "basic",
     name: "أساسية",
     price: 99,
     old: 199,
@@ -25,6 +26,7 @@ const plans = [
     ],
   },
   {
+    id: "medium",
     name: "متوسطة",
     price: 199,
     old: 399,
@@ -41,6 +43,7 @@ const plans = [
     ],
   },
   {
+    id: "pro",
     name: "برو",
     price: 349,
     old: 699,
