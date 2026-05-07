@@ -23,15 +23,33 @@ const Settings = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("full_name,business_name,business_type").eq("id", user.id).maybeSingle()
+    supabase.from("profiles").select("full_name,business_name,business_type,plan,plan_end_date").eq("id", user.id).maybeSingle()
       .then(({ data }) => {
-        if (data) setProfile({
-          full_name: data.full_name ?? "",
-          business_name: data.business_name ?? "",
-          business_type: data.business_type ?? "",
-        });
+        if (data) {
+          setProfile({
+            full_name: data.full_name ?? "",
+            business_name: data.business_name ?? "",
+            business_type: data.business_type ?? "",
+          });
+          if (data.plan && data.plan !== "free") {
+            setPlan({ plan: data.plan, end: (data as any).plan_end_date ?? null });
+          }
+        }
       });
   }, [user]);
+
+  const cancelSubscription = async () => {
+    if (!user) return;
+    if (!confirm("هل أنت متأكد من إلغاء الاشتراك؟ هتفضل تستفيد من الباقة لحد نهاية الفترة المدفوعة.")) return;
+    setCancelling(true);
+    const { error } = await supabase.from("profiles").update({
+      plan: "free", plan_end_date: null, plan_start_date: null,
+    }).eq("id", user.id);
+    setCancelling(false);
+    if (error) { toast.error("حصلت مشكلة، جرب تاني"); return; }
+    setPlan(null);
+    toast.success("تم إلغاء الاشتراك");
+  };
 
   const save = async () => {
     if (!user) return;
