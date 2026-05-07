@@ -104,6 +104,49 @@ const Cell = ({ v }: { v: boolean | string }) =>
 
 const Pricing = () => {
   const { d, h, m, s } = useCountdown(LAUNCH_END);
+  const { user } = useAuth();
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [planEnd, setPlanEnd] = useState<string | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("plan, plan_end_date").eq("id", user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data && data.plan && data.plan !== "free") {
+          const end = data.plan_end_date ? new Date(data.plan_end_date as string) : null;
+          if (!end || end > new Date()) {
+            setCurrentPlan(data.plan);
+            setPlanEnd((data as any).plan_end_date);
+          }
+        }
+      });
+  }, [user]);
+
+  const daysLeft = planEnd ? Math.max(0, Math.ceil((new Date(planEnd).getTime() - Date.now()) / 86400000)) : 0;
+
+  const handleSubscribe = async (planId: string) => {
+    if (!user) {
+      toast("سجّل دخولك أولاً");
+      window.location.href = "/login";
+      return;
+    }
+    setLoadingPlan(planId);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-payment", {
+        body: { plan: planId, userId: user.id },
+      });
+      if (error) throw error;
+      if (data?.payment_url) {
+        window.location.href = data.payment_url;
+      } else {
+        throw new Error("No payment URL");
+      }
+    } catch (e) {
+      toast.error("حصلت مشكلة في تجهيز الدفع، جرب تاني");
+      setLoadingPlan(null);
+    }
+  };
 
   return (
     <div className="min-h-screen">
