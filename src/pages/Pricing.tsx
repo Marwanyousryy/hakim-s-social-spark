@@ -197,14 +197,22 @@ const Pricing = () => {
       {/* Cards */}
       <section className="mx-auto max-w-6xl px-4 py-12">
         <div className="grid gap-6 md:grid-cols-3">
-          {plans.map((p) => (
+          {plans.map((p) => {
+            const isCurrent = currentPlan === p.id;
+            return (
             <div
               key={p.name}
               className={`relative flex flex-col rounded-2xl border bg-foreground/[0.02] p-6 transition ${
-                p.popular ? "border-gold/60 shadow-gold md:-translate-y-2" : "border-foreground/10 hover:border-gold/30"
+                isCurrent ? "border-emerald-500/60 shadow-[0_0_30px_rgba(16,185,129,0.15)]"
+                  : p.popular ? "border-gold/60 shadow-gold md:-translate-y-2" : "border-foreground/10 hover:border-gold/30"
               }`}
             >
-              {p.popular && (
+              {isCurrent && (
+                <div className="absolute -top-3 right-1/2 translate-x-1/2 rounded-full bg-emerald-500 px-4 py-1 text-xs font-black text-background">
+                  باقتك الحالية
+                </div>
+              )}
+              {!isCurrent && p.popular && (
                 <div className="absolute -top-3 right-1/2 translate-x-1/2 rounded-full bg-gradient-to-l from-[hsl(var(--gold-deep))] to-[hsl(var(--gold-bright))] px-4 py-1 text-xs font-black text-background shadow-gold">
                   MOST POPULAR
                 </div>
@@ -222,6 +230,12 @@ const Pricing = () => {
               </div>
               <div className="mt-1 text-sm text-foreground/40 line-through">{p.old} جنيه</div>
 
+              {isCurrent && daysLeft > 0 && (
+                <div className="mt-3 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 ring-1 ring-emerald-500/30">
+                  متبقي {daysLeft} يوم
+                </div>
+              )}
+
               <ul className="mt-6 flex-1 space-y-2.5">
                 {p.features.map((f) => (
                   <li key={f.label} className="flex items-center gap-2 text-sm">
@@ -235,19 +249,26 @@ const Pricing = () => {
                 ))}
               </ul>
 
-              <Link
-                to="/register"
-                className={`mt-7 inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-bold transition hover:scale-[1.02] ${
+              <button
+                onClick={() => handleSubscribe(p.id)}
+                disabled={isCurrent || loadingPlan !== null}
+                className={`mt-7 inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-bold transition hover:scale-[1.02] disabled:opacity-60 disabled:hover:scale-100 ${
                   p.popular
                     ? "bg-gradient-to-l from-[hsl(var(--gold-deep))] via-[hsl(var(--gold))] to-[hsl(var(--gold-bright))] text-background shadow-gold"
                     : "border border-gold/40 text-gold hover:bg-gold/10"
                 }`}
               >
-                ابدأ دلوقتي
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
+                {loadingPlan === p.id ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> جاري تجهيز الدفع...</>
+                ) : isCurrent ? (
+                  "مفعّلة"
+                ) : (
+                  <>ابدأ دلوقتي <ArrowLeft className="h-4 w-4" /></>
+                )}
+              </button>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-8 flex justify-center">
