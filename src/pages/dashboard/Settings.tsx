@@ -155,6 +155,25 @@ const Settings = () => {
           </label>
         ))}
       </section>
+
+      {plan && (
+        <section className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-5 sm:p-6">
+          <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-bold text-rose-300">
+            <AlertTriangle className="h-4 w-4" /> إلغاء الاشتراك
+          </h2>
+          <p className="mb-4 text-sm text-foreground/70">
+            باقتك الحالية: <span className="font-bold text-gold">{plan.plan}</span>
+            {plan.end && ` — تنتهي في ${new Date(plan.end).toLocaleDateString("ar-EG")}`}
+          </p>
+          <button
+            onClick={cancelSubscription}
+            disabled={cancelling}
+            className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-5 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
+          >
+            {cancelling ? "..." : "إلغاء الاشتراك"}
+          </button>
+        </section>
+      )}
     </div>
   );
 };
