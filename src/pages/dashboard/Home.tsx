@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { FileText, TrendingUp, Link2, Hash, PenSquare, Inbox } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +36,15 @@ const statusBadge = (s: string) => {
 const Home = () => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("payment") === "success") {
+      toast.success("🎉 تم الاشتراك بنجاح! مرحباً بك في حاكم");
+      searchParams.delete("payment");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!user) return;

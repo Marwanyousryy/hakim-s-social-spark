@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Instagram, Facebook, Twitter, Youtube, Sparkles } from "lucide-react";
+import { Instagram, Facebook, Twitter, Youtube, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,18 +18,38 @@ const Settings = () => {
   const [profile, setProfile] = useState({ full_name: "", business_name: "", business_type: "" });
   const [saving, setSaving] = useState(false);
   const [notif, setNotif] = useState({ posts: true, weekly: true, marketing: false });
+  const [plan, setPlan] = useState<{ plan: string; end: string | null } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("full_name,business_name,business_type").eq("id", user.id).maybeSingle()
+    supabase.from("profiles").select("full_name,business_name,business_type,plan,plan_end_date").eq("id", user.id).maybeSingle()
       .then(({ data }) => {
-        if (data) setProfile({
-          full_name: data.full_name ?? "",
-          business_name: data.business_name ?? "",
-          business_type: data.business_type ?? "",
-        });
+        if (data) {
+          setProfile({
+            full_name: data.full_name ?? "",
+            business_name: data.business_name ?? "",
+            business_type: data.business_type ?? "",
+          });
+          if (data.plan && data.plan !== "free") {
+            setPlan({ plan: data.plan, end: (data as any).plan_end_date ?? null });
+          }
+        }
       });
   }, [user]);
+
+  const cancelSubscription = async () => {
+    if (!user) return;
+    if (!confirm("هل أنت متأكد من إلغاء الاشتراك؟ هتفضل تستفيد من الباقة لحد نهاية الفترة المدفوعة.")) return;
+    setCancelling(true);
+    const { error } = await supabase.from("profiles").update({
+      plan: "free", plan_end_date: null, plan_start_date: null,
+    }).eq("id", user.id);
+    setCancelling(false);
+    if (error) { toast.error("حصلت مشكلة، جرب تاني"); return; }
+    setPlan(null);
+    toast.success("تم إلغاء الاشتراك");
+  };
 
   const save = async () => {
     if (!user) return;
@@ -135,6 +155,25 @@ const Settings = () => {
           </label>
         ))}
       </section>
+
+      {plan && (
+        <section className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-5 sm:p-6">
+          <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-bold text-rose-300">
+            <AlertTriangle className="h-4 w-4" /> إلغاء الاشتراك
+          </h2>
+          <p className="mb-4 text-sm text-foreground/70">
+            باقتك الحالية: <span className="font-bold text-gold">{plan.plan}</span>
+            {plan.end && ` — تنتهي في ${new Date(plan.end).toLocaleDateString("ar-EG")}`}
+          </p>
+          <button
+            onClick={cancelSubscription}
+            disabled={cancelling}
+            className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-5 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 disabled:opacity-60"
+          >
+            {cancelling ? "..." : "إلغاء الاشتراك"}
+          </button>
+        </section>
+      )}
     </div>
   );
 };
