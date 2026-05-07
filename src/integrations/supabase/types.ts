@@ -73,6 +73,9 @@ export type Database = {
           full_name: string | null
           id: string
           plan: string
+          plan_end_date: string | null
+          plan_start_date: string | null
+          trial_used: boolean
           updated_at: string
         }
         Insert: {
@@ -82,6 +85,9 @@ export type Database = {
           full_name?: string | null
           id: string
           plan?: string
+          plan_end_date?: string | null
+          plan_start_date?: string | null
+          trial_used?: boolean
           updated_at?: string
         }
         Update: {
@@ -91,6 +97,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           plan?: string
+          plan_end_date?: string | null
+          plan_start_date?: string | null
+          trial_used?: boolean
           updated_at?: string
         }
         Relationships: []
