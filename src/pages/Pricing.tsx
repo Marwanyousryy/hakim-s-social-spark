@@ -1,6 +1,9 @@
-import { Check, X, Flame, ArrowLeft, Gift } from "lucide-react";
+import { Check, X, Flame, ArrowLeft, Gift, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const LAUNCH_END = Date.now() + 30 * 24 * 60 * 60 * 1000;
 
