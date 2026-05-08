@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { FileText, TrendingUp, Link2, Hash, PenSquare, Inbox } from "lucide-react";
+import { FileText, TrendingUp, Link2, Hash, PenSquare, Inbox, Sparkles, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlanStatus } from "@/hooks/usePlanStatus";
 
 type Post = {
   id: string;
