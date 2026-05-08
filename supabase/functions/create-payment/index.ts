@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("create-payment error:", e);
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
+    return new Response(JSON.stringify({ error: "Payment setup failed, please try again." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

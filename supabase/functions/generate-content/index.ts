@@ -94,6 +94,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Length limits to prevent prompt-injection abuse and resource exhaustion
+    const platformStr = Array.isArray(platform) ? platform.join(",") : String(platform);
+    const checks: Array<[string, unknown, number]> = [
+      ["description", description, 500],
+      ["businessType", businessType, 100],
+      ["tone", tone, 50],
+      ["language", language, 30],
+      ["platform", platformStr, 200],
+    ];
+    for (const [name, val, max] of checks) {
+      if (typeof val !== "string" && !Array.isArray(val)) {
+        return new Response(
+          JSON.stringify({ error: `قيمة ${name} غير صحيحة` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const len = typeof val === "string" ? val.length : platformStr.length;
+      if (len > max) {
+        return new Response(
+          JSON.stringify({ error: `الحقل ${name} طويل جداً (الحد الأقصى ${max} حرف)` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     // Plan + usage check
     const { data: profile } = await supabase
       .from("profiles")
