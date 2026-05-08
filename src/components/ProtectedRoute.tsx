@@ -1,9 +1,13 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlanStatus } from "@/hooks/usePlanStatus";
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
-  if (loading) {
+  const plan = usePlanStatus();
+  const location = useLocation();
+
+  if (loading || (user && plan.loading)) {
     return (
       <div className="grid min-h-screen place-items-center text-foreground/60">
         جاري التحميل...
@@ -11,6 +15,13 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+
+  // Trial expired and no paid plan -> force pricing (allow settings/package routes too)
+  const allowPath = location.pathname.startsWith("/dashboard/settings")
+    || location.pathname.startsWith("/dashboard/package");
+  if (plan.trialExpired && !plan.isPaid && !allowPath) {
+    return <Navigate to="/pricing" replace />;
+  }
   return children;
 };
 
