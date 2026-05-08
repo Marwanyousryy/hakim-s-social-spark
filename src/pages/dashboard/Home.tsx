@@ -36,6 +36,7 @@ const statusBadge = (s: string) => {
 
 const Home = () => {
   const { user } = useAuth();
+  const plan = usePlanStatus();
   const [posts, setPosts] = useState<Post[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -53,12 +54,43 @@ const Home = () => {
       .then(({ data }) => setPosts(data ?? []));
   }, [user]);
 
+  const planLabel: Record<string, string> = { basic: "أساسية", medium: "متوسطة", pro: "برو" };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-black sm:text-4xl">الرئيسية</h1>
         <p className="mt-1 text-sm text-foreground/60">نظرة سريعة على نشاطك</p>
       </div>
+
+      {plan.isTrial && (
+        <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-gold/30 bg-gold/5 p-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-bold">الفترة التجريبية فعّالة</div>
+              <div className="text-sm text-foreground/60">متبقي <span className="font-bold text-gold">{plan.daysRemaining}</span> يوم — اختر باقتك قبل انتهاء التجربة</div>
+            </div>
+          </div>
+          <Link to="/pricing" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-l from-[hsl(var(--gold-deep))] via-[hsl(var(--gold))] to-[hsl(var(--gold-bright))] px-4 py-2 text-sm font-bold text-background shadow-gold transition hover:scale-[1.02]">
+            <Sparkles className="h-4 w-4" /> ترقية الآن
+          </Link>
+        </div>
+      )}
+
+      {plan.isPaid && (
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-bold">باقتك الحالية: {planLabel[plan.plan] ?? plan.plan}</div>
+            <div className="text-sm text-foreground/60">متبقي <span className="font-bold text-emerald-400">{plan.daysRemaining}</span> يوم</div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         <StatCard icon={FileText} label="المنشورات هذا الشهر" value={posts.length} />
