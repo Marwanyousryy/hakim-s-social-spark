@@ -2,14 +2,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
 const PLAN_LIMITS: Record<string, number> = {
   free: 10,
-  mid: 50,
-  high: Number.POSITIVE_INFINITY,
+  basic: 30,
+  medium: 80,
+  pro: Number.POSITIVE_INFINITY,
 };
 
 const SYSTEM_PROMPT = `أنت خبير سوشيال ميديا متخصص في السوق المصري والخليجي.

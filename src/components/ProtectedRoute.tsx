@@ -16,10 +16,11 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   }
   if (!user) return <Navigate to="/login" replace />;
 
-  // Trial expired and no paid plan -> force pricing (allow settings/package routes too)
-  const allowPath = location.pathname.startsWith("/dashboard/settings")
+  // Trial expired and no paid plan -> send to pricing
+  // Allow settings + package so the user can still manage their account
+  const isAllowedWhenExpired = location.pathname.startsWith("/dashboard/settings")
     || location.pathname.startsWith("/dashboard/package");
-  if (plan.trialExpired && !plan.isPaid && !allowPath) {
+  if (plan.trialExpired && !plan.isPaid && !isAllowedWhenExpired) {
     return <Navigate to="/pricing" replace />;
   }
   return children;
