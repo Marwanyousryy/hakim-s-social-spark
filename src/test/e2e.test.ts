@@ -127,7 +127,7 @@ describe("E2E: Application System Test", () => {
     it("should have all valid routes defined", () => {
       expect(validRoutes).toHaveLength(12);
       validRoutes.forEach((route) => {
-        expect(route).toMatch(/^\/[a-z0-9\-\/]*$/);
+        expect(route).toMatch(/^\/[a-z0-9\-/]*$/);
       });
     });
 

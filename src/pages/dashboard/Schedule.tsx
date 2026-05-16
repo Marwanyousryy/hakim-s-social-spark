@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Schedule = () => {
   const { user } = useAuth();
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<{ id: string; platform: string; scheduled_at: string; content: string }[]>([]);
 
   useEffect(() => {
     if (!user) return;

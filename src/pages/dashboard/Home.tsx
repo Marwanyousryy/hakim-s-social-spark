@@ -14,7 +14,14 @@ type Post = {
   created_at: string;
 };
 
-const StatCard = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) => (
+const getMonthStartIso = () => {
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  return monthStart.toISOString();
+};
+
+const StatCard = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) => (
   <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-5 transition hover:border-gold/30">
     <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gold/30 bg-gold/10 text-gold">
       <Icon className="h-5 w-5" />
@@ -37,12 +44,21 @@ const statusBadge = (s: string) => {
 const Home = () => {
   const { user } = useAuth();
   const plan = usePlanStatus();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [recentPosts, setRecentPosts] = useState<Post[]>([]);
+  const [monthlyPostCount, setMonthlyPostCount] = useState(0);
+  const [engagementPct, setEngagementPct] = useState(0);
+  const [platformsCount, setPlatformsCount] = useState(0);
+  const [hashtagsGenerated, setHashtagsGenerated] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
-    if (searchParams.get("payment") === "success") {
+    const payment = searchParams.get("payment");
+    if (payment === "success") {
       toast.success("🎉 تم الاشتراك بنجاح! مرحباً بك في حاكم");
+      searchParams.delete("payment");
+      setSearchParams(searchParams, { replace: true });
+    } else if (payment === "failed") {
+      toast.error("لم تتم عملية الدفع. جرّب مرة أخرى أو تواصل مع الدعم.");
       searchParams.delete("payment");
       setSearchParams(searchParams, { replace: true });
     }
@@ -50,8 +66,55 @@ const Home = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("posts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5)
-      .then(({ data }) => setPosts(data ?? []));
+
+    const monthStartIso = getMonthStartIso();
+
+    const loadDashboard = async () => {
+      const [recentRes, monthlyCountRes, monthPostsRes, generationsRes] = await Promise.all([
+        supabase
+          .from("posts")
+          .select("id, platform, content, status, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("posts")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .gte("created_at", monthStartIso),
+        supabase
+          .from("posts")
+          .select("platform, status")
+          .eq("user_id", user.id)
+          .gte("created_at", monthStartIso),
+        supabase
+          .from("content_generations")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .gte("created_at", monthStartIso),
+      ]);
+
+      setRecentPosts((recentRes.data as Post[] | null) ?? []);
+      setMonthlyPostCount(monthlyCountRes.count ?? 0);
+      setHashtagsGenerated(generationsRes.count ?? 0);
+
+      const monthPosts = monthPostsRes.data ?? [];
+      const total = monthPosts.length;
+      const published = monthPosts.filter((p) => p.status === "published").length;
+      setEngagementPct(total > 0 ? Math.round((published / total) * 100) : 0);
+
+      const platformSet = new Set<string>();
+      for (const p of monthPosts) {
+        p.platform
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .forEach((id) => platformSet.add(id));
+      }
+      setPlatformsCount(platformSet.size);
+    };
+
+    loadDashboard();
   }, [user]);
 
   const planLabel: Record<string, string> = { basic: "أساسية", medium: "متوسطة", pro: "برو" };
@@ -93,10 +156,10 @@ const Home = () => {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-        <StatCard icon={FileText} label="المنشورات هذا الشهر" value={posts.length} />
-        <StatCard icon={TrendingUp} label="نسبة التفاعل" value="0%" />
-        <StatCard icon={Link2} label="المنصات المربوطة" value={0} />
-        <StatCard icon={Hash} label="الهاشتاجات المولدة" value={0} />
+        <StatCard icon={FileText} label="المنشورات هذا الشهر" value={monthlyPostCount} />
+        <StatCard icon={TrendingUp} label="نسبة التفاعل" value={`${engagementPct}%`} />
+        <StatCard icon={Link2} label="المنصات المربوطة" value={platformsCount} />
+        <StatCard icon={Hash} label="الهاشتاجات المولدة" value={hashtagsGenerated} />
       </div>
 
       <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-5 sm:p-6">
@@ -111,7 +174,7 @@ const Home = () => {
           </Link>
         </div>
 
-        {posts.length === 0 ? (
+        {recentPosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-foreground/15 py-12 text-center">
             <Inbox className="mb-3 h-10 w-10 text-foreground/30" />
             <p className="text-sm text-foreground/60">لسه ماعندكش منشورات.</p>
@@ -129,7 +192,7 @@ const Home = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-foreground/5">
-                {posts.map((p) => (
+                {recentPosts.map((p) => (
                   <tr key={p.id}>
                     <td className="py-3 pr-2">{p.platform}</td>
                     <td className="max-w-[16rem] truncate py-3 text-foreground/80">{p.content}</td>

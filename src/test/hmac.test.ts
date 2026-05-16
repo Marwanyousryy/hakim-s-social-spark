@@ -15,12 +15,12 @@ async function computeHmacTest(secret: string, message: string): Promise<string>
     .join("");
 }
 
-function getPathTest(obj: any, path: string): string {
+function getPathTest(obj: Record<string, unknown>, path: string): string {
   const parts = path.split(".");
-  let cur: any = obj;
+  let cur: unknown = obj;
   for (const p of parts) {
-    if (cur == null) return "";
-    cur = cur[p];
+    if (cur == null || typeof cur !== "object") return "";
+    cur = (cur as Record<string, unknown>)[p];
   }
   if (cur === null || cur === undefined) return "";
   return String(cur);

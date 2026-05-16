@@ -12,7 +12,7 @@ const PLAN_AMOUNTS: Record<string, number> = {
   pro: 34900,
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -39,7 +39,8 @@ Deno.serve(async (req) => {
     }
     const user = userData.user;
 
-    const { plan } = await req.json();
+    const body: any = await req.json();
+    const { plan } = body;
     if (!plan || !PLAN_AMOUNTS[plan]) {
       return new Response(JSON.stringify({ error: "Invalid plan" }), {
         status: 400,
@@ -53,22 +54,22 @@ Deno.serve(async (req) => {
     const IFRAME_ID = Deno.env.get("PAYMOB_IFRAME_ID")!;
 
     // Step 1: Auth
-    const authRes = await fetch("https://accept.paymob.com/api/auth/tokens", {
+    const authRes: any = await fetch("https://accept.paymob.com/api/auth/tokens", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: API_KEY }),
     });
-    const authJson = await authRes.json();
-    const token = authJson.token;
-    if (!token) throw new Error("Paymob auth failed");
+    const authJson: any = await authRes.json();
+    const paymobToken = authJson.token;
+    if (!paymobToken) throw new Error("Paymob auth failed");
 
     // Step 2: Order
     const merchantOrderId = `${user.id}_${plan}_${Date.now()}`;
-    const orderRes = await fetch("https://accept.paymob.com/api/ecommerce/orders", {
+    const orderRes: any = await fetch("https://accept.paymob.com/api/ecommerce/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        auth_token: token,
+        auth_token: paymobToken,
         delivery_needed: false,
         amount_cents: amount,
         currency: "EGP",
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
         items: [],
       }),
     });
-    const orderJson = await orderRes.json();
+    const orderJson: any = await orderRes.json();
     if (!orderJson.id) throw new Error("Paymob order failed: " + JSON.stringify(orderJson));
 
     // Step 3: Payment key
@@ -84,11 +85,11 @@ Deno.serve(async (req) => {
     const [first_name, ...rest] = fullName.split(" ");
     const last_name = rest.join(" ") || first_name || "User";
 
-    const pkRes = await fetch("https://accept.paymob.com/api/acceptance/payment_keys", {
+    const pkRes: any = await fetch("https://accept.paymob.com/api/acceptance/payment_keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        auth_token: token,
+        auth_token: paymobToken,
         amount_cents: amount,
         expiration: 3600,
         order_id: orderJson.id,
@@ -100,10 +101,9 @@ Deno.serve(async (req) => {
         },
         currency: "EGP",
         integration_id: Number(INTEGRATION_ID),
-        extra: { user_id: user.id, plan },
       }),
     });
-    const pkJson = await pkRes.json();
+    const pkJson: any = await pkRes.json();
     if (!pkJson.token) throw new Error("Paymob payment key failed: " + JSON.stringify(pkJson));
 
     const payment_url = `https://accept.paymob.com/api/acceptance/iframes/${IFRAME_ID}?payment_token=${pkJson.token}`;

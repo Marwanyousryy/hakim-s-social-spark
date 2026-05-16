@@ -37,7 +37,7 @@ const DashboardLayout = () => {
 
   return (
     <div className="relative min-h-screen">
-      <div className="absolute inset-0 grid-pattern opacity-20" aria-hidden />
+      <div className="absolute inset-0 grid-pattern opacity-20 pointer-events-none" aria-hidden />
 
       {/* Mobile top bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-foreground/10 bg-background/80 px-4 py-3 backdrop-blur md:hidden">

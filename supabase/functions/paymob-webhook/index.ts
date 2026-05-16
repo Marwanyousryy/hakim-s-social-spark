@@ -15,12 +15,12 @@ const HMAC_FIELDS = [
   "source_data.pan", "source_data.sub_type", "source_data.type", "success",
 ];
 
-function getPath(obj: any, path: string): string {
+function getPath(obj: Record<string, unknown>, path: string): string {
   const parts = path.split(".");
-  let cur: any = obj;
+  let cur: unknown = obj;
   for (const p of parts) {
-    if (cur == null) return "";
-    cur = cur[p];
+    if (cur == null || typeof cur !== "object") return "";
+    cur = (cur as Record<string, unknown>)[p];
   }
   if (cur === null || cur === undefined) return "";
   return String(cur);
@@ -47,8 +47,15 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   try {
     const HMAC_SECRET = Deno.env.get("PAYMOB_HMAC_SECRET");
@@ -61,7 +68,7 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const body = await req.json();
+    const body: any = await req.json();
     const obj = body.obj || body;
 
     // Paymob sends hmac as query param `hmac` (transaction processed callback)

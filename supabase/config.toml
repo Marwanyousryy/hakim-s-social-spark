@@ -1,4 +1,7 @@
-project_id = "fwizsoudphfjwbdlullp"
+project_id = "nhsvwlwxrweyptdqnxjg"
 
 [functions.paymob-webhook]
+verify_jwt = false
+
+[functions.paymob-response-webhook]
 verify_jwt = false

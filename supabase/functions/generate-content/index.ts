@@ -42,7 +42,7 @@ function buildUserPrompt(input: {
 }`;
 }
 
-function extractJson(text: string): any {
+function extractJson(text: string): Record<string, unknown> {
   try {
     return JSON.parse(text);
   } catch {
@@ -52,7 +52,7 @@ function extractJson(text: string): any {
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     }
     const userId = userData.user.id;
 
-    const body = await req.json();
+    const body: any = await req.json();
     const { description, platform, tone, language, businessType } = body ?? {};
     if (!description || !platform || !tone || !language || !businessType) {
       return new Response(
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
       language,
     });
 
-    const aiRes = await fetch(
+    const aiRes: any = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",

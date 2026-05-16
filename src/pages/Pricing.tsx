@@ -117,7 +117,7 @@ const Pricing = () => {
           const end = data.plan_end_date ? new Date(data.plan_end_date as string) : null;
           if (!end || end > new Date()) {
             setCurrentPlan(data.plan);
-            setPlanEnd((data as any).plan_end_date);
+            setPlanEnd(data.plan_end_date as string);
           }
         }
       });

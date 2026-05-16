@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Upload,
   ImageOff,
@@ -42,6 +42,15 @@ const LOADING_STAGES = [
   "جاري اختيار الهاشتاجات...",
 ];
 
+const PLAN_LIMITS: Record<string, number> = {
+  free: 10,
+  basic: 30,
+  medium: 80,
+  pro: Number.POSITIVE_INFINITY,
+};
+
+const MEDIA_INPUT_ID = "create-content-media-input";
+
 type GenerationResult = {
   caption: string;
   hashtags: string[];
@@ -49,8 +58,32 @@ type GenerationResult = {
   tips: string;
 };
 
+type GenerateContentResponse = {
+  error?: string;
+  caption?: string;
+  hashtags?: string[];
+  bestTime?: string;
+  tips?: string;
+  message?: string;
+};
+
+async function parseFunctionsError(
+  error: { message?: string; context?: { json: () => Promise<unknown> } },
+): Promise<GenerateContentResponse | null> {
+  try {
+    const ctx = error.context;
+    if (!ctx) return null;
+    return (await ctx.json()) as GenerateContentResponse;
+  } catch {
+    return null;
+  }
+}
+
 const CreateContent = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
+
   const [skipMedia, setSkipMedia] = useState(false);
   const [media, setMedia] = useState<File | null>(null);
   const [description, setDescription] = useState("");
@@ -58,26 +91,26 @@ const CreateContent = () => {
   const [tone, setTone] = useState("ودود");
   const [lang, setLang] = useState("عربي مصري");
   const [businessType, setBusinessType] = useState("أخرى");
+  const [userPlan, setUserPlan] = useState("free");
   const [generating, setGenerating] = useState(false);
   const [stageIdx, setStageIdx] = useState(0);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [limitOpen, setLimitOpen] = useState(false);
 
-  // Load business type from profile for better prompting
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("business_type")
+      .select("business_type, plan")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (data?.business_type) setBusinessType(data.business_type);
+        if (data?.plan) setUserPlan(data.plan);
       });
   }, [user]);
 
-  // Cycle through loading stages
   useEffect(() => {
     if (!generating) return;
     setStageIdx(0);
@@ -87,16 +120,101 @@ const CreateContent = () => {
     return () => clearInterval(id);
   }, [generating]);
 
-  const togglePlatform = (id: string) =>
+  const togglePlatform = (id: string) => {
     setPlatforms((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const f = e.dataTransfer.files?.[0];
-    if (f) setMedia(f);
   };
 
-  const generate = async () => {
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current += 1;
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = 0;
+    const f = e.dataTransfer.files?.[0];
+    if (f) {
+      setMedia(f);
+      setSkipMedia(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setMedia(f);
+    if (f) setSkipMedia(false);
+  };
+
+  const buildDescriptionForGeneration = () => {
+    const base = description.trim();
+    if (skipMedia || !media) return base;
+    return `${base}\n[مرفق ميديا: ${media.name}]`;
+  };
+
+  const checkMonthlyLimit = async (): Promise<boolean> => {
+    if (!user) return false;
+    const limit = PLAN_LIMITS[userPlan] ?? PLAN_LIMITS.free;
+    if (!Number.isFinite(limit)) return false;
+
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+
+    const { count, error } = await supabase
+      .from("content_generations")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", monthStart.toISOString());
+
+    if (error) return false;
+    if ((count ?? 0) >= limit) {
+      setLimitOpen(true);
+      return true;
+    }
+    return false;
+  };
+
+  const applyGenerationPayload = (payload: GenerateContentResponse | null) => {
+    if (!payload) return false;
+    if (payload.error === "limit_reached") {
+      setLimitOpen(true);
+      return true;
+    }
+    if (payload.error) {
+      toast.error(payload.error);
+      return true;
+    }
+    if (payload.caption !== undefined || payload.hashtags !== undefined) {
+      setResult({
+        caption: payload.caption ?? "",
+        hashtags: Array.isArray(payload.hashtags) ? payload.hashtags : [],
+        bestTime: payload.bestTime ?? "",
+        tips: payload.tips ?? "",
+      });
+      toast.success("تم توليد المحتوى ✨");
+      return true;
+    }
+    return false;
+  };
+
+  const handleGenerate = async () => {
+    if (!user || !session?.access_token) {
+      toast.error("سجّل دخولك أولاً");
+      return;
+    }
     if (!description.trim()) {
       toast.error("اكتب وصف بسيط للمنتج أو الحدث");
       return;
@@ -105,13 +223,17 @@ const CreateContent = () => {
       toast.error("اختر منصة واحدة على الأقل");
       return;
     }
+
+    if (await checkMonthlyLimit()) return;
+
     setGenerating(true);
     setResult(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-content", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: {
-          description,
+          description: buildDescriptionForGeneration(),
           platform: platforms,
           tone,
           language: lang,
@@ -119,55 +241,48 @@ const CreateContent = () => {
         },
       });
 
+      const payload = (data ?? null) as GenerateContentResponse | null;
+
+      if (applyGenerationPayload(payload)) return;
+
       if (error) {
-        // Try to read structured payload from edge function error
-        const ctx: any = (error as any).context;
-        let payload: any = null;
-        try {
-          payload = ctx ? await ctx.json() : null;
-        } catch {
-          /* ignore */
-        }
-        if (payload?.error === "limit_reached") {
-          setLimitOpen(true);
-        } else {
-          toast.error(payload?.error || error.message || "حصلت مشكلة، جرّب تاني");
-        }
+        const fromError = await parseFunctionsError(error);
+        if (applyGenerationPayload(fromError)) return;
+        toast.error(fromError?.error || error.message || "حصلت مشكلة، جرّب تاني");
         return;
       }
 
-      if (data?.error === "limit_reached") {
-        setLimitOpen(true);
-        return;
-      }
-
-      setResult({
-        caption: data?.caption ?? "",
-        hashtags: Array.isArray(data?.hashtags) ? data.hashtags : [],
-        bestTime: data?.bestTime ?? "",
-        tips: data?.tips ?? "",
-      });
-      toast.success("تم توليد المحتوى ✨");
-    } catch (e: any) {
-      toast.error(e?.message || "حصلت مشكلة، جرّب تاني");
+      toast.error("حصلت مشكلة، جرّب تاني");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "حصلت مشكلة، جرّب تاني";
+      toast.error(message);
     } finally {
       setGenerating(false);
     }
   };
 
-  const removeTag = (t: string) =>
+  const removeTag = (t: string) => {
     setResult((r) => (r ? { ...r, hashtags: r.hashtags.filter((x) => x !== t) } : r));
+  };
 
   const copyCaption = async () => {
     if (!result) return;
-    await navigator.clipboard.writeText(result.caption);
-    toast.success("تم نسخ الكابشن 📋");
+    try {
+      await navigator.clipboard.writeText(result.caption);
+      toast.success("تم نسخ الكابشن 📋");
+    } catch {
+      toast.error("حصلت مشكلة، جرب تاني");
+    }
   };
 
   const copyHashtags = async () => {
     if (!result) return;
-    await navigator.clipboard.writeText(result.hashtags.join(" "));
-    toast.success("تم نسخ الهاشتاجات 📋");
+    try {
+      await navigator.clipboard.writeText(result.hashtags.join(" "));
+      toast.success("تم نسخ الهاشتاجات 📋");
+    } catch {
+      toast.error("حصلت مشكلة، جرب تاني");
+    }
   };
 
   const saveDraft = async (status: "draft" | "scheduled") => {
@@ -210,6 +325,7 @@ const CreateContent = () => {
               <ImageOff className="h-4 w-4" /> هتولّد بدون ميديا
             </div>
             <button
+              type="button"
               onClick={() => setSkipMedia(false)}
               className="text-xs text-foreground/60 hover:text-foreground"
             >
@@ -219,8 +335,11 @@ const CreateContent = () => {
         ) : (
           <>
             <label
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={onDrop}
+              htmlFor={MEDIA_INPUT_ID}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-foreground/15 bg-foreground/[0.02] py-10 px-4 text-center transition hover:border-gold/40"
             >
               <Upload className="mb-3 h-8 w-8 text-foreground/40" />
@@ -231,15 +350,19 @@ const CreateContent = () => {
                 أو اضغط للاختيار من جهازك
               </div>
               <input
+                id={MEDIA_INPUT_ID}
+                ref={fileInputRef}
                 type="file"
                 accept="image/*,video/*"
                 className="hidden"
-                onChange={(e) => setMedia(e.target.files?.[0] ?? null)}
+                onChange={handleFileChange}
               />
             </label>
             <button
+              type="button"
               onClick={() => {
                 setMedia(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
                 setSkipMedia(true);
               }}
               className="mt-3 text-xs text-gold hover:underline"
@@ -326,7 +449,8 @@ const CreateContent = () => {
       <section className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-5 sm:p-6">
         <h2 className="mb-4 font-display text-lg font-bold">٣. الذكاء الاصطناعي</h2>
         <button
-          onClick={generate}
+          type="button"
+          onClick={handleGenerate}
           disabled={generating}
           className="w-full rounded-xl bg-gradient-to-l from-[hsl(var(--gold-deep))] via-[hsl(var(--gold))] to-[hsl(var(--gold-bright))] px-6 py-3.5 font-bold text-background shadow-gold transition hover:scale-[1.01] disabled:opacity-60"
         >
@@ -372,6 +496,7 @@ const CreateContent = () => {
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="block text-xs font-bold text-gold">الكابشن المقترح</label>
                 <button
+                  type="button"
                   onClick={copyCaption}
                   className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-foreground/70 hover:bg-foreground/10"
                 >
@@ -390,6 +515,7 @@ const CreateContent = () => {
               <div className="mb-2 flex items-center justify-between">
                 <label className="block text-xs font-bold text-gold">الهاشتاجات</label>
                 <button
+                  type="button"
                   onClick={copyHashtags}
                   className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-foreground/70 hover:bg-foreground/10"
                 >
@@ -400,6 +526,7 @@ const CreateContent = () => {
                 {result.hashtags.map((t) => (
                   <button
                     key={t}
+                    type="button"
                     onClick={() => removeTag(t)}
                     className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-3 py-1 text-xs text-gold ring-1 ring-gold/30 hover:bg-destructive/20 hover:text-destructive hover:ring-destructive/30"
                   >
@@ -429,13 +556,15 @@ const CreateContent = () => {
 
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={generate}
+                type="button"
+                onClick={handleGenerate}
                 disabled={generating}
                 className="inline-flex items-center gap-2 rounded-full border border-foreground/20 px-4 py-2 text-sm hover:bg-foreground/5 disabled:opacity-60"
               >
                 <RefreshCw className="h-4 w-4" /> أعد التوليد 🔄
               </button>
               <button
+                type="button"
                 disabled={saving}
                 onClick={() => saveDraft("draft")}
                 className="inline-flex items-center gap-2 rounded-full border border-foreground/20 px-4 py-2 text-sm hover:bg-foreground/5 disabled:opacity-60"
@@ -443,6 +572,7 @@ const CreateContent = () => {
                 <Save className="h-4 w-4" /> حفظ كمسودة
               </button>
               <button
+                type="button"
                 disabled={saving}
                 onClick={() => saveDraft("scheduled")}
                 className="inline-flex items-center gap-2 rounded-full bg-gold/15 px-4 py-2 text-sm text-gold ring-1 ring-gold/30 hover:bg-gold/20 disabled:opacity-60"
@@ -476,6 +606,7 @@ const CreateContent = () => {
               <Sparkles className="h-4 w-4" /> ترقية الباقة
             </Link>
             <button
+              type="button"
               onClick={() => setLimitOpen(false)}
               className="text-xs text-foreground/60 hover:text-foreground"
             >
