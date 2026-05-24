@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const platformStr = Array.isArray(platform) ? platform.join(", ") : platform;
     const userPrompt = `قم بإنشاء محتوى لمنصة ${platformStr}. الوصف: ${description}. نوع العمل: ${businessType}. نبرة الصوت: ${tone}. اللغة المطلوبة: ${language}.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash/generateContent?key=${GEMINI_API_KEY}&prompt=${encodeURIComponent(userPrompt)}`;
     
     console.log("Sending bulletproof JSON to Gemini...");
     const response = await fetch(url, {
