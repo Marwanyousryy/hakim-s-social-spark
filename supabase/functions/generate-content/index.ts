@@ -1,246 +1,85 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+/// <reference path="../deno.d.ts" />
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PLAN_LIMITS: Record<string, number> = {
-  free: 10,
-  basic: 30,
-  medium: 80,
-  pro: Number.POSITIVE_INFINITY,
-};
-
-const SYSTEM_PROMPT = `أنت خبير سوشيال ميديا متخصص في السوق المصري والخليجي.
-مهمتك إنشاء محتوى احترافي وجذاب للبيزنس.
-رد دائماً بـ JSON فقط بدون أي نص خارجه.`;
-
-function buildUserPrompt(input: {
-  businessType: string;
-  description: string;
-  platform: string[] | string;
-  tone: string;
-  language: string;
-}) {
-  const platform = Array.isArray(input.platform)
-    ? input.platform.join(", ")
-    : input.platform;
-  return `اكتب محتوى سوشيال ميديا لـ: ${input.businessType}
-الوصف: ${input.description}
-المنصة: ${platform}
-نبرة الكلام: ${input.tone}
-اللغة: ${input.language}
-
-أرجع JSON بالشكل ده بالظبط:
-{
-  "caption": "الكابشن الكامل هنا",
-  "hashtags": ["هاشتاج1", "هاشتاج2", "هاشتاج3", "هاشتاج4", "هاشتاج5", "هاشتاج6", "هاشتاج7", "هاشتاج8", "هاشتاج9", "هاشتاج10"],
-  "bestTime": "أفضل وقت للنشر",
-  "tips": "نصيحة سريعة لزيادة التفاعل"
-}`;
-}
-
-function extractJson(text: string): Record<string, unknown> {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (m) return JSON.parse(m[0]);
-    throw new Error("تعذر قراءة رد الذكاء الاصطناعي");
-  }
-}
-
-Deno.serve(async (req: any) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+Deno.serve(async (req) => {
+  // 1. Handle CORS OPTIONS Preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "غير مصرح" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-
-    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
-    if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "غير مصرح" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const userId = userData.user.id;
-
-    const body: any = await req.json();
-    const { description, platform, tone, language, businessType } = body ?? {};
-    if (!description || !platform || !tone || !language || !businessType) {
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "البيانات ناقصة، تأكد من ملء كل الحقول" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "مفتاح الذكاء الاصطناعي غير مهيأ في السيرفر" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Length limits to prevent prompt-injection abuse and resource exhaustion
-    const platformStr = Array.isArray(platform) ? platform.join(",") : String(platform);
-    const checks: Array<[string, unknown, number]> = [
-      ["description", description, 500],
-      ["businessType", businessType, 100],
-      ["tone", tone, 50],
-      ["language", language, 30],
-      ["platform", platformStr, 200],
-    ];
-    for (const [name, val, max] of checks) {
-      if (typeof val !== "string" && !Array.isArray(val)) {
-        return new Response(
-          JSON.stringify({ error: `قيمة ${name} غير صحيحة` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      const len = typeof val === "string" ? val.length : platformStr.length;
-      if (len > max) {
-        return new Response(
-          JSON.stringify({ error: `الحقل ${name} طويل جداً (الحد الأقصى ${max} حرف)` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-    }
+    // 2. Parse request body
+    const { description, platform, tone, language, businessType } = await req.json();
 
-    // Plan + usage check
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("id", userId)
-      .maybeSingle();
+    // 3. Define Prompts
+    const systemPrompt = `أنت خبير محترف في إدارة وسائل التواصل الاجتماعي وصناعة المحتوى التسويقي المبتكر باللغة العربية.`;
+    
+    // Handle platform as array or string
+    const platformStr = Array.isArray(platform) ? platform.join(", ") : platform;
+    const userPrompt = `قم بإنشاء محتوى لمنصة ${platformStr}. الوصف: ${description}. نوع العمل: ${businessType}. نبرة الصوت: ${tone}. اللغة المطلوبة: ${language}.`;
 
-    const plan = (profile?.plan as string) ?? "free";
-    const limit = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
-
-    const monthStart = new Date();
-    monthStart.setUTCDate(1);
-    monthStart.setUTCHours(0, 0, 0, 0);
-
-    const { count } = await supabase
-      .from("content_generations")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", monthStart.toISOString());
-
-    if ((count ?? 0) >= limit) {
-      return new Response(
-        JSON.stringify({
-          error: "limit_reached",
-          plan,
-          limit,
-          used: count ?? 0,
-          message:
-            "وصلت للحد الأقصى للباقة المجانية\nترقّي دلوقتي وولّد محتوى بلا حدود! 💎",
-        }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "مفتاح الذكاء الاصطناعي غير مهيأ" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const userPrompt = buildUserPrompt({
-      businessType,
-      description,
-      platform,
-      tone,
-      language,
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    console.log("Sending bulletproof JSON to Gemini...");
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json" 
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: `${systemPrompt}\n\nالسياق والمطلوب:\n${userPrompt}` }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }
+      })
     });
 
-    const aiRes: any = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: userPrompt },
-          ],
-        }),
-      },
-    );
+    const result = await response.json();
 
-    if (!aiRes.ok) {
-      if (aiRes.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "كتر الطلبات، استنى شوية وجرب تاني" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (aiRes.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "الرصيد خلص، رجاءً اشحن باقتك من Lovable" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      const errText = await aiRes.text();
-      console.error("AI gateway error", aiRes.status, errText);
+    if (!response.ok) {
+      console.error("Gemini API Direct Error:", result);
       return new Response(
-        JSON.stringify({ error: "حصلت مشكلة في توليد المحتوى، جرّب تاني بعد شوية" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ error: "فشل جيمني في توليد المحتوى", details: result }),
+        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const aiPayload = await aiRes.json();
-    const text: string = aiPayload?.choices?.[0]?.message?.content ?? "";
-    const parsed = extractJson(text);
-
-    // Track usage (best-effort)
-    await supabase.from("content_generations").insert({ user_id: userId });
-
+    // 5. Safe Extract Response Text
+    const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    
     return new Response(
-      JSON.stringify({
-        caption: parsed.caption ?? "",
-        hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
-        bestTime: parsed.bestTime ?? "",
-        tips: parsed.tips ?? "",
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ content: generatedText }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e) {
-    console.error("generate-content error", e);
+
+  } catch (error: any) {
+    console.error("Global Edge Function Error:", error);
     return new Response(
-      JSON.stringify({ error: "حصلت مشكلة غير متوقعة، جرّب تاني" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ error: "حدث خطأ داخلي في السيرفر", details: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
